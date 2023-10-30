@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/creack/pty"
 	"github.com/gliderlabs/ssh"
 	"github.com/pkg/sftp"
 	"golang.org/x/text/encoding/unicode"
@@ -99,14 +98,14 @@ func handleShell(s ssh.Session) {
 	ptyReq, _, isPty := s.Pty()
 	if isPty {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
-		f, err := pty.Start(cmd)
+		pty, err := StartPTY(cmd)
 		if err != nil {
 			fmt.Fprintf(s, "cannot start program: %v\n", err)
 			s.Exit(127)
 			return
 		}
-		go io.Copy(f, s)
-		go io.Copy(s, f)
+		go io.Copy(pty, s)
+		go io.Copy(s, pty)
 	} else {
 		// We need to use StdinPipe, otherwise Wait may end up blocking
 		// until a full line of text has been sent by the client, even
