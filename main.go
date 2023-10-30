@@ -53,6 +53,9 @@ func main() {
 	server.SetOption(ssh.PublicKeyAuth(func(ctx ssh.Context, key ssh.PublicKey) bool {
 		return true // allow all keys
 	}))
+	server.SetOption(ssh.PasswordAuth(func(ctx ssh.Context, passwd string) bool {
+		return true // allow all users+passwords
+	}))
 
 	slog.Info("starting ssh server", "address", cli.Bind)
 
