@@ -10,6 +10,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/gliderlabs/ssh"
+	"github.com/google/shlex"
 	"github.com/pkg/sftp"
 	"golang.org/x/text/encoding/unicode"
 )
@@ -71,7 +72,7 @@ func handleShell(s ssh.Session) {
 	if rawcmd != "" {
 		switch cli.Shell {
 		case "sh", "bash", "zsh", "ash", "dash", "fish":
-			args = append(args, "-c", rawcmd)
+			args = append(args, cli.Shell, "-c", rawcmd)
 		case "powershell", "pwsh":
 			utfenc, err := windowsUTF16.NewEncoder().String(rawcmd)
 			if err != nil {
@@ -81,11 +82,21 @@ func handleShell(s ssh.Session) {
 				return
 			}
 			b64enc := base64.StdEncoding.EncodeToString([]byte(utfenc))
-			args = append(args, "-EncodedCommand", b64enc)
+			args = append(args, cli.Shell, "-EncodedCommand", b64enc)
+		default:
+			words, err := shlex.Split(cli.Shell)
+			if err != nil {
+				logger.Error("splitting shell command", "command", cli.Shell, "error", err)
+				fmt.Fprintf(s, "failed to construct shell command: %v\n", err)
+				s.Exit(127)
+				return
+			}
+			args = append(args, words...)
+			args = append(args, rawcmd)
 		}
 	}
 
-	cmd := exec.CommandContext(s.Context(), cli.Shell, args...)
+	cmd := exec.CommandContext(s.Context(), args[0], args[1:]...)
 	cmd.Env = append(s.Environ(), cli.Env...)
 	cmd.Dir = cli.Chdir
 
