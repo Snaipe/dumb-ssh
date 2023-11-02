@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 	"os/exec"
-	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/gliderlabs/ssh"
@@ -18,11 +17,10 @@ import (
 var windowsUTF16 = unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM)
 
 var cli struct {
-	Chdir     string
-	Env       []string
-	Bind      string        `default:":2222"`
-	Shell     string        `default:"sh"`
-	WaitDelay time.Duration `default:"100ms"`
+	Chdir     string   `help:"set current work directory"`
+	Env       []string `help:"set extra environment variable"`
+	Bind      string   `default:":2222" help:"address to bind the server to"`
+	Shell     string   `default:"sh" help:"shell command to execute"`
 }
 
 func main() {
