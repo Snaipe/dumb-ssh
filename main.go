@@ -31,7 +31,7 @@ func main() {
 	var forwardHandler ssh.ForwardedTCPHandler
 
 	server := ssh.Server{
-		Addr: cli.Bind,
+		Addr:    cli.Bind,
 		Handler: handleShell,
 		SubsystemHandlers: map[string]ssh.SubsystemHandler{
 			"sftp": handleSftp,
