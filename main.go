@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"os/exec"
 
 	"github.com/alecthomas/kong"
@@ -17,10 +18,11 @@ import (
 var windowsUTF16 = unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM)
 
 var cli struct {
-	Chdir     string   `help:"set current work directory"`
-	Env       []string `help:"set extra environment variable"`
-	Bind      string   `default:":2222" help:"address to bind the server to"`
-	Shell     string   `default:"sh" help:"shell command to execute"`
+	Chdir string   `help:"set current work directory"`
+	NoEnv bool     `help:"do not inherit current environment"`
+	Env   []string `help:"set extra environment variable"`
+	Bind  string   `default:":2222" help:"address to bind the server to"`
+	Shell string   `default:"sh" help:"shell command to execute"`
 }
 
 func main() {
@@ -95,7 +97,11 @@ func handleShell(s ssh.Session) {
 	}
 
 	cmd := exec.CommandContext(s.Context(), args[0], args[1:]...)
-	cmd.Env = append(s.Environ(), cli.Env...)
+	if !cli.NoEnv {
+		cmd.Env = append(cmd.Env, os.Environ()...)
+	}
+	cmd.Env = append(cmd.Env, s.Environ()...)
+	cmd.Env = append(cmd.Env, cli.Env...)
 	cmd.Dir = cli.Chdir
 
 	logger.Info("start", "command", cmd.Args)
