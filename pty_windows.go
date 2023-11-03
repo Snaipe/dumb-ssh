@@ -92,7 +92,7 @@ func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
 	}
 
 	var cmdline *uint16
-	if len(cmd.Args) > 1 {
+	if len(cmd.Args) > 0 {
 		cmd := windows.ComposeCommandLine(cmd.Args)
 		if len(cmd) > 0 {
 			cmdline, err = windows.UTF16PtrFromString(cmd)
@@ -102,9 +102,12 @@ func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
 		}
 	}
 
-	workdir, err := windows.UTF16PtrFromString(cmd.Dir)
-	if err != nil {
-		return nil, nil, &os.SyscallError{Syscall: "creating utf16 workdir", Err: err}
+	var workdir *uint16
+	if len(cmd.Dir) > 0 {
+		workdir, err = windows.UTF16PtrFromString(cmd.Dir)
+		if err != nil {
+			return nil, nil, &os.SyscallError{Syscall: "creating utf16 workdir", Err: err}
+		}
 	}
 
 	var envblock []uint16
