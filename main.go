@@ -10,7 +10,6 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/gliderlabs/ssh"
-	"github.com/google/shlex"
 	"github.com/pkg/sftp"
 	"golang.org/x/text/encoding/unicode"
 )
@@ -22,7 +21,7 @@ var cli struct {
 	NoEnv bool     `help:"do not inherit current environment"`
 	Env   []string `help:"set extra environment variable"`
 	Bind  string   `default:":2222" help:"address to bind the server to"`
-	Shell string   `default:"sh" help:"shell command to execute"`
+	Shell string   `default:"sh" help:"shell program name to execute. Must support -c, or be a known windows shell (cmd, powershell, pwsh)"`
 }
 
 func main() {
@@ -71,8 +70,8 @@ func handleShell(s ssh.Session) {
 	var args []string
 	if rawcmd != "" {
 		switch cli.Shell {
-		case "sh", "bash", "zsh", "ash", "dash", "fish":
-			args = append(args, cli.Shell, "-c", rawcmd)
+		case "cmd":
+			args = append(args, "/c", rawcmd)
 		case "powershell", "pwsh":
 			utfenc, err := windowsUTF16.NewEncoder().String(rawcmd)
 			if err != nil {
@@ -82,21 +81,13 @@ func handleShell(s ssh.Session) {
 				return
 			}
 			b64enc := base64.StdEncoding.EncodeToString([]byte(utfenc))
-			args = append(args, cli.Shell, "-EncodedCommand", b64enc)
+			args = append(args, "-EncodedCommand", b64enc)
 		default:
-			words, err := shlex.Split(cli.Shell)
-			if err != nil {
-				logger.Error("splitting shell command", "command", cli.Shell, "error", err)
-				fmt.Fprintf(s, "failed to construct shell command: %v\n", err)
-				s.Exit(127)
-				return
-			}
-			args = append(args, words...)
-			args = append(args, rawcmd)
+			args = append(args, "-c", rawcmd)
 		}
 	}
 
-	cmd := exec.CommandContext(s.Context(), args[0], args[1:]...)
+	cmd := exec.CommandContext(s.Context(), cli.Shell, args...)
 	if !cli.NoEnv {
 		cmd.Env = append(cmd.Env, os.Environ()...)
 	}
