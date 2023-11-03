@@ -44,7 +44,7 @@ func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
 
 	var ptyIn, ptsIn windows.Handle
 	if err := windows.CreatePipe(&ptsIn, &ptyIn, nil, 0); err != nil {
-		return nil, nil, err
+		return nil, nil, &os.SyscallError{Syscall: "CreatePipe", Err: err}
 	}
 	defer func() {
 		if ptyIn != windows.Handle(0) {
@@ -55,7 +55,7 @@ func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
 
 	var ptyOut, ptsOut windows.Handle
 	if err := windows.CreatePipe(&ptyOut, &ptsOut, nil, 0); err != nil {
-		return nil, nil, err
+		return nil, nil, &os.SyscallError{Syscall: "CreatePipe", Err: err}
 	}
 	defer func() {
 		if ptyIn != windows.Handle(0) {
@@ -69,12 +69,12 @@ func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
 	var pty windows.Handle
 	err := windows.CreatePseudoConsole(winsz, ptsIn, ptsOut, 0, &pty)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, &os.SyscallError{Syscall: "CreatePseudoConsole", Err: err}
 	}
 
 	attrlist, err := windows.NewProcThreadAttributeList(1)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, &os.SyscallError{Syscall: "NewProcThreadAttributeList", Err: err}
 	}
 
 	err = attrlist.Update(
@@ -83,29 +83,29 @@ func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
 		unsafe.Sizeof(pty),
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, &os.SyscallError{Syscall: "UpdateProcThreadAttributeList", Err: err}
 	}
 
 	progname, err := windows.UTF16PtrFromString(cmd.Path)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, &os.SyscallError{Syscall: "creating utf16 progname", Err: err}
 	}
 
 	cmdline, err := windows.UTF16PtrFromString(windows.ComposeCommandLine(cmd.Args))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, &os.SyscallError{Syscall: "creating utf16 cmdline", Err: err}
 	}
 
 	workdir, err := windows.UTF16PtrFromString(cmd.Dir)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, &os.SyscallError{Syscall: "creating utf16 workdir", Err: err}
 	}
 
 	var envblock []uint16
 	for _, e := range cmd.Env {
 		env, err := windows.UTF16FromString(e)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, &os.SyscallError{Syscall: "creating utf16 envp", Err: err}
 		}
 		envblock = append(envblock, env...)
 		envblock = append(envblock, 0)
@@ -133,7 +133,7 @@ func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
 		&procinfo,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, &os.SyscallError{Syscall: "CreateProcess", Err: err}
 	}
 
 	cmd.Process, err = os.FindProcess(int(procinfo.ProcessId))
@@ -147,11 +147,11 @@ func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
 		defer windows.CloseHandle(procinfo.Process)
 		defer windows.CloseHandle(procinfo.Thread)
 		if _, err := windows.WaitForSingleObject(procinfo.Process, windows.INFINITE); err != nil {
-			return 127, err
+			return 127, &os.SyscallError{Syscall: "WaitForSingleObject", Err: err}
 		}
 		var exit uint32
 		if err := windows.GetExitCodeProcess(procinfo.Process, &exit); err != nil {
-			return 127, err
+			return 127, &os.SyscallError{Syscall: "GetExitCodeProcess", Err: err}
 		}
 		return int(exit), nil
 	}
