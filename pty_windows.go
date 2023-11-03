@@ -91,9 +91,15 @@ func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
 		return nil, nil, &os.SyscallError{Syscall: "creating utf16 progname", Err: err}
 	}
 
-	cmdline, err := windows.UTF16PtrFromString(windows.ComposeCommandLine(cmd.Args))
-	if err != nil {
-		return nil, nil, &os.SyscallError{Syscall: "creating utf16 cmdline", Err: err}
+	var cmdline *uint16
+	if len(cmd.Args) > 1 {
+		cmd := windows.ComposeCommandLine(cmd.Args)
+		if len(cmd) > 0 {
+			cmdline, err = windows.UTF16PtrFromString(cmd)
+			if err != nil {
+				return nil, nil, &os.SyscallError{Syscall: "creating utf16 cmdline", Err: err}
+			}
+		}
 	}
 
 	workdir, err := windows.UTF16PtrFromString(cmd.Dir)
