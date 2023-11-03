@@ -111,14 +111,18 @@ func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
 	}
 
 	var envblock []uint16
-	for _, e := range cmd.Env {
-		env, err := windows.UTF16FromString(e)
-		if err != nil {
-			return nil, nil, &os.SyscallError{Syscall: "creating utf16 envp", Err: err}
-		}
-		envblock = append(envblock, env...)
+	if len(cmd.Env) == 0 {
 		envblock = append(envblock, 0)
+	} else {
+		for _, e := range cmd.Env {
+			env, err := windows.UTF16FromString(e)
+			if err != nil {
+				return nil, nil, &os.SyscallError{Syscall: "creating utf16 envp", Err: err}
+			}
+			envblock = append(envblock, env...)
+		}
 	}
+	envblock = append(envblock, 0)
 
 	var envp *uint16
 	if len(envblock) > 0 {
@@ -136,7 +140,7 @@ func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
 		nil,
 		nil,
 		true,
-		windows.EXTENDED_STARTUPINFO_PRESENT,
+		windows.CREATE_UNICODE_ENVIRONMENT | windows.EXTENDED_STARTUPINFO_PRESENT,
 		envp,
 		workdir,
 		&siex.StartupInfo,
