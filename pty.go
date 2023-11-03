@@ -6,4 +6,7 @@ import (
 
 type PTY interface {
 	io.ReadWriteCloser
+	Resize(width, height int) error
 }
+
+type WaitFunc func() (int, error)

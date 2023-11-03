@@ -101,10 +101,11 @@ func handleShell(s ssh.Session) {
 	s.Signals(signals)
 	defer s.Signals(nil)
 
+	var waitfn WaitFunc
 	ptyReq, _, isPty := s.Pty()
 	if isPty {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
-		pty, err := StartPTY(cmd)
+		pty, wait, err := StartPTY(cmd)
 		if err != nil {
 			fmt.Fprintf(s, "cannot start program: %v\n", err)
 			s.Exit(127)
@@ -112,6 +113,7 @@ func handleShell(s ssh.Session) {
 		}
 		go io.Copy(pty, s)
 		go io.Copy(s, pty)
+		waitfn = wait
 	} else {
 		// We need to use StdinPipe, otherwise Wait may end up blocking
 		// until a full line of text has been sent by the client, even
@@ -130,24 +132,32 @@ func handleShell(s ssh.Session) {
 			return
 		}
 		go io.Copy(stdin, s)
+		waitfn = func() (int, error) {
+			err := cmd.Wait()
+			return cmd.ProcessState.ExitCode(), err
+		}
 	}
 	logger.Info("waiting")
 
-	waitErr := make(chan error, 1)
-	go func() { waitErr <- cmd.Wait(); logger.Info("wait done") }()
+	waitRes := make(chan int, 1)
+	go func() {
+		code, _ := waitfn()
+		waitRes <- code
+	}()
 
+	var exitcode int
 Wait:
 	for {
 		select {
-		case <-waitErr:
+		case exitcode = <-waitRes:
 			break Wait
 		case sig := <-signals:
 			cmd.Process.Signal(SignalNum(sig))
 		}
 	}
 
-	logger.Error("exit", "status", cmd.ProcessState.String())
-	s.Exit(cmd.ProcessState.ExitCode())
+	logger.Error("exit", "status", exitcode)
+	s.Exit(exitcode)
 }
 
 func handleSftp(s ssh.Session) {
