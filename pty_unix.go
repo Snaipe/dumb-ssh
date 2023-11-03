@@ -14,8 +14,9 @@ type ptyimpl struct {
 	*os.File
 }
 
-func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
-	f, err := pty.Start(cmd)
+func StartPTY(cmd *exec.Cmd, width, height int) (PTY, WaitFunc, error) {
+	sz := pty.Winsize{Rows: uint16(height), Cols: uint16(width)}
+	f, err := pty.StartWithSize(cmd, &sz)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -27,6 +28,5 @@ func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
 }
 
 func (p *ptyimpl) Resize(width, height int) error {
-	pty.Setsize(p.File, &pty.Winsize{Rows: uint16(height), Cols: uint16(width)})
-	return nil
+	return pty.Setsize(p.File, &pty.Winsize{Rows: uint16(height), Cols: uint16(width)})
 }

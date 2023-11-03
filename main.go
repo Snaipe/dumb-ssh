@@ -102,15 +102,31 @@ func handleShell(s ssh.Session) {
 	defer s.Signals(nil)
 
 	var waitfn WaitFunc
-	ptyReq, _, isPty := s.Pty()
+	ptyReq, winupdate, isPty := s.Pty()
 	if isPty {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
-		pty, wait, err := StartPTY(cmd)
+		pty, wait, err := StartPTY(cmd, ptyReq.Window.Width, ptyReq.Window.Height)
 		if err != nil {
 			fmt.Fprintf(s, "cannot start program: %v\n", err)
 			s.Exit(127)
 			return
 		}
+
+		// resize console appropriately
+		go func() {
+			for {
+				select {
+				case <-s.Context().Done():
+					return
+				case winsz := <-winupdate:
+					err := pty.Resize(winsz.Width, winsz.Height)
+					if err != nil {
+						logger.Error("resize", "dimensions", winsz, "error", err)
+					}
+				}
+			}
+		}()
+
 		go io.Copy(pty, s)
 		go io.Copy(s, pty)
 		waitfn = wait

@@ -34,7 +34,7 @@ func (pty *conpty) Resize(width, height int) error {
 	return windows.ResizePseudoConsole(pty.pty, sz)
 }
 
-func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
+func StartPTY(cmd *exec.Cmd, width, height int) (PTY, WaitFunc, error) {
 
 	// We have to reimplement os.StartProcess ourselves because we simply
 	// have no way to pass in the pseudoconsole.
@@ -64,7 +64,7 @@ func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
 		windows.CloseHandle(ptsIn)
 	}()
 
-	winsz := windows.Coord{X: 80, Y: 32}
+	winsz := windows.Coord{X: int16(width), Y: int16(height)}
 
 	var pty windows.Handle
 	err := windows.CreatePseudoConsole(winsz, ptsIn, ptsOut, 0, &pty)
