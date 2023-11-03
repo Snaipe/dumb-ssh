@@ -123,6 +123,7 @@ func StartPTY(cmd *exec.Cmd) (PTY, WaitFunc, error) {
 	}
 
 	var siex windows.StartupInfoEx
+	siex.Cb = uint32(unsafe.Sizeof(siex))
 	siex.ProcThreadAttributeList = attrlist.List()
 
 	var procinfo windows.ProcessInformation
